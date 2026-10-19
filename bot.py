@@ -5,6 +5,7 @@
 # Addons for barracks
 # Research
 # Rally logic
+# Smarter attack logic
 
 from sc2 import maps
 from sc2.bot_ai import BotAI
