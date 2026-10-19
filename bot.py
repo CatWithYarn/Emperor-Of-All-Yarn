@@ -1,7 +1,10 @@
 # To do:
 # Marine micro
 # Building placement improvements
-# 
+# More intelligent expansion logic
+# Lower Depots automatically
+# Addons for barracks
+# Research
 
 from sc2 import maps
 from sc2.bot_ai import BotAI
@@ -25,7 +28,10 @@ class MyBot(BotAI):
         barracks = self.structures(UnitTypeId.BARRACKS).amount
 
         await self.distribute_workers()
-
+       
+        # lower depots
+        for 
+        
         # Workers (every base)
         for th in self.townhalls.ready.idle:
             if self.workers.amount < 22 * bases and self.can_afford(UnitTypeId.SCV):
