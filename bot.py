@@ -37,7 +37,7 @@ class MyBot(BotAI):
         
         # Workers (every base)
         for th in self.townhalls.ready.idle:
-            if self.workers.amount < 16 * bases and self.can_afford(UnitTypeId.SCV):
+            if self.workers.amount < (16 * bases + 3 * self.gas_buildings.ready.amount) and self.can_afford(UnitTypeId.SCV):
                 th.train(UnitTypeId.SCV)
 
         # Supply (buffer grows with production)
@@ -46,20 +46,37 @@ class MyBot(BotAI):
                 and self.can_afford(UnitTypeId.SUPPLYDEPOT)
                 and self.supply_cap < 200):
             await self.build(UnitTypeId.SUPPLYDEPOT, near=cc)
-
         
-        # Barracks: up to 3 per base
+        # Addon logic
+        if (self.can_afford(UnitTypeId.REACTOR)):
+            for rax in self.structures(UnitTypeId.BARRACKS).ready:
+                if not rax.has_add_on and not rax.orders:
+                    rax.build(UnitTypeId.BARRACKSREACTOR)
+                    break
+        
+        # Barracks: up to 3 per base     
         depots = self.structures({UnitTypeId.SUPPLYDEPOT, UnitTypeId.SUPPLYDEPOTLOWERED}).ready
         if (depots
                 and barracks < 3 * bases
                 and not self.already_pending(UnitTypeId.BARRACKS)
                 and self.can_afford(UnitTypeId.BARRACKS)):
-            await self.build(UnitTypeId.BARRACKS, near=cc)
+            anchor = cc.position.towards(self.game_info.map_center, 10)
+            position = await self.find_placement(UnitTypeId.BARRACKS, near=anchor,
+                                            placement_step=3, addon_place=True)
+            if position:
+                worker = self.select_build_worker(position)
+                if worker:
+                    worker.build(UnitTypeId.BARRACKS, position)   
 
         # Marine Production
-        for rax in self.structures(UnitTypeId.BARRACKS).ready.idle:
+        for rax in self.structures(UnitTypeId.BARRACKS).ready:
             if self.can_afford(UnitTypeId.MARINE):
-                rax.train(UnitTypeId.MARINE)
+                if rax.has_reactor:
+                    if 2>len(rax.orders):
+                        rax.train(UnitTypeId.MARINE)
+                else:
+                    if 1>len(rax.orders):
+                        rax.train(UnitTypeId.MARINE)
 
         # Expand once the current base has its 3 barracks
         if (barracks >= 3 * bases and bases < 4
@@ -67,7 +84,20 @@ class MyBot(BotAI):
                 and self.can_afford(UnitTypeId.COMMANDCENTER)):
             await self.expand_now()
 
-        # Attack
+        # Gas mining
+        if (self.gas_buildings.amount < 2 
+                and not self.already_pending(UnitTypeId.REFINERY)
+                and self.can_afford(UnitTypeId.REFINERY)
+                and self.structures(UnitTypeId.BARRACKS).amount>=2):
+            for geyser in self.vespene_geyser.closer_than(10, cc):
+                if self.gas_buildings.closer_than(1, geyser):
+                    continue  # already has a refinery
+                worker = self.select_build_worker(geyser.position)
+                if worker:
+                    worker.build_gas(geyser)
+                    break
+
+        # Attack logic
         marines = self.units(UnitTypeId.MARINE)
         if marines.amount >= 20:
             for m in marines:
@@ -76,10 +106,10 @@ class MyBot(BotAI):
             for m in marines.idle:
                 m.attack(cc.position)
 
-
 run_game(
     maps.get("PersephoneAIE_v4"),
-    [Bot(Race.Terran, MyBot()), Computer(Race.Zerg, Difficulty.MediumHard)],
+    [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
+      Computer(Race.Zerg, Difficulty.MediumHard)],
     realtime=False,
     sc2_version="4.10"
 )
