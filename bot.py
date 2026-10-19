@@ -2,9 +2,9 @@
 # Marine micro
 # Building placement improvements
 # More intelligent expansion logic
-# Lower Depots automatically
 # Addons for barracks
 # Research
+# Rally logic
 
 from sc2 import maps
 from sc2.bot_ai import BotAI
@@ -13,6 +13,7 @@ from sc2.ids.unit_typeid import UnitTypeId
 from sc2.main import run_game
 from sc2.player import Bot, Computer
 from sc2.paths import Paths, BINPATH, PF
+from sc2.ids.ability_id import AbilityId
 
 Paths.EXECUTABLE = (
     Paths.BASE / "Versions" / "Base75689" / BINPATH[PF]
@@ -29,28 +30,32 @@ class MyBot(BotAI):
 
         await self.distribute_workers()
        
-        # lower depots
-        for 
+        # Lower depots
+        for depot in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
+            depot(AbilityId.MORPH_SUPPLYDEPOT_LOWER)
         
         # Workers (every base)
         for th in self.townhalls.ready.idle:
-            if self.workers.amount < 22 * bases and self.can_afford(UnitTypeId.SCV):
+            if self.workers.amount < 16 * bases and self.can_afford(UnitTypeId.SCV):
                 th.train(UnitTypeId.SCV)
 
         # Supply (buffer grows with production)
         if (self.supply_left < 4 + 2 * barracks
                 and self.already_pending(UnitTypeId.SUPPLYDEPOT) < 2
-                and self.can_afford(UnitTypeId.SUPPLYDEPOT)):
+                and self.can_afford(UnitTypeId.SUPPLYDEPOT)
+                and self.supply_cap < 200):
             await self.build(UnitTypeId.SUPPLYDEPOT, near=cc)
 
+        
         # Barracks: up to 3 per base
-        if (self.structures(UnitTypeId.SUPPLYDEPOT).ready
+        depots = self.structures({UnitTypeId.SUPPLYDEPOT, UnitTypeId.SUPPLYDEPOTLOWERED}).ready
+        if (depots
                 and barracks < 3 * bases
                 and not self.already_pending(UnitTypeId.BARRACKS)
                 and self.can_afford(UnitTypeId.BARRACKS)):
             await self.build(UnitTypeId.BARRACKS, near=cc)
 
-        # Marines
+        # Marine Production
         for rax in self.structures(UnitTypeId.BARRACKS).ready.idle:
             if self.can_afford(UnitTypeId.MARINE):
                 rax.train(UnitTypeId.MARINE)
@@ -73,7 +78,7 @@ class MyBot(BotAI):
 
 run_game(
     maps.get("PersephoneAIE_v4"),
-    [Bot(Race.Terran, MyBot()), Computer(Race.Zerg, Difficulty.Medium)],
+    [Bot(Race.Terran, MyBot()), Computer(Race.Zerg, Difficulty.MediumHard)],
     realtime=False,
     sc2_version="4.10"
 )
