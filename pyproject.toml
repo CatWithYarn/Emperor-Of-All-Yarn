@@ -1,0 +1,9 @@
+[project]
+name = "sc2bot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.15"
+dependencies = [
+    "burnysc2>=7.3.0",
+]
