@@ -80,16 +80,16 @@ class MyBot(BotAI):
                         rax.train(UnitTypeId.MARINE)
 
         # Expand once the current base has its 3 barracks
-        if (barracks >= 3 * bases and bases < 4
+        if (barracks >= 2 * bases and bases < 5
                 and not self.already_pending(UnitTypeId.COMMANDCENTER)
                 and self.can_afford(UnitTypeId.COMMANDCENTER)):
             await self.expand_now()
 
         # Gas mining
-        if (self.gas_buildings.amount < 2 
+        if (self.gas_buildings.amount < 1 
                 and not self.already_pending(UnitTypeId.REFINERY)
                 and self.can_afford(UnitTypeId.REFINERY)
-                and self.structures(UnitTypeId.BARRACKS).amount>=2):
+                and self.structures(UnitTypeId.BARRACKS).amount>=1):
             for geyser in self.vespene_geyser.closer_than(10, cc):
                 if self.gas_buildings.closer_than(1, geyser):
                     continue  # already has a refinery
@@ -110,7 +110,7 @@ class MyBot(BotAI):
 run_game(
     maps.get("PersephoneAIE_v4"),
     [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
-      Computer(Race.Zerg, Difficulty.Hard)],
+      Computer(Race.Zerg, Difficulty.VeryHard)],
     realtime=False,
     sc2_version="4.10"
 )
