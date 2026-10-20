@@ -2,7 +2,8 @@
 # Marine micro
 # Building placement improvements
 # More intelligent expansion logic
-# Addons for barracks
+# Better barrack placement
+# Improved addon addition logic
 # Research
 # Rally logic
 # Smarter attack logic
@@ -29,7 +30,7 @@ class MyBot(BotAI):
         bases = self.townhalls.amount
         barracks = self.structures(UnitTypeId.BARRACKS).amount
 
-        await self.distribute_workers()
+        await self.distribute_workers(1)
        
         # Lower depots
         for depot in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
@@ -109,7 +110,7 @@ class MyBot(BotAI):
 run_game(
     maps.get("PersephoneAIE_v4"),
     [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
-      Computer(Race.Zerg, Difficulty.MediumHard)],
+      Computer(Race.Zerg, Difficulty.Hard)],
     realtime=False,
     sc2_version="4.10"
 )
