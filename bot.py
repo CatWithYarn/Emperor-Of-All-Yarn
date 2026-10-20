@@ -2,11 +2,12 @@
 # Marine micro
 # Building placement improvements
 # More intelligent expansion logic
-# Better barrack placement
+# Better barrack placement - Partially done
 # Improved addon addition logic
 # Research
 # Rally logic
-# Smarter attack logic
+# Smarter attack logic - Partially done
+# Game messages
 
 from sc2 import maps
 from sc2.bot_ai import BotAI
@@ -22,6 +23,16 @@ Paths.EXECUTABLE = (
 )
 
 class MyBot(BotAI):
+    retreat_ratio = 0.4 # When to retreat
+    worthiness_ratio = 0.8 # How much does the original force still have
+    reinforce_ratio = 0.9 # Minimum force needed to reinforce
+    attack_threshold_increment = 4
+    max_attack_threshold = 80
+    def __init__(self):
+        self.marine_attack_squad:set = set() # Marine attack group
+        self.attack_threshold = 20 # How many marines in attack squad until attack
+        self.is_attacking: bool = False
+    
     async def on_step(self, iteration: int):
         if not self.townhalls:
             return
@@ -33,8 +44,9 @@ class MyBot(BotAI):
         await self.distribute_workers(1)
        
         # Lower depots
-        for depot in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
-            depot(AbilityId.MORPH_SUPPLYDEPOT_LOWER)
+        if iteration %20 ==0:
+            for depot in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
+                depot(AbilityId.MORPH_SUPPLYDEPOT_LOWER)
         
         # Workers (every base)
         for th in self.townhalls.ready.idle:
@@ -79,7 +91,7 @@ class MyBot(BotAI):
                     if 1>len(rax.orders):
                         rax.train(UnitTypeId.MARINE)
 
-        # Expand once the current base has its 3 barracks
+        # Expand once the current base has at least 2 barracks
         if (barracks >= 2 * bases and bases < 5
                 and not self.already_pending(UnitTypeId.COMMANDCENTER)
                 and self.can_afford(UnitTypeId.COMMANDCENTER)):
@@ -98,15 +110,44 @@ class MyBot(BotAI):
                     worker.build_gas(geyser)
                     break
 
-        # Attack logic
-        marines = self.units(UnitTypeId.MARINE)
-        if marines.amount >= 20:
-            for m in marines:
-                m.attack(self.enemy_start_locations[0])
-        else:
-            for m in marines.idle:
-                m.attack(cc.position)
-
+        # In progress
+        # More sophisticated attack logic
+        # If not above threshold, don't attack
+        # If above, transform all defense marines into attack
+        # Start stockpiling new marines after attack
+        # If attack dies, clearly we need more marines to attack
+        # If the attack doesn't die by the time another attack is ready, it is probably worthy of reinforcements
+        if iteration %4 == 0:
+            marines = self.units(UnitTypeId.MARINE)
+            # Discard dead marines
+            self.marine_attack_squad = marines.tags.intersection(self.marine_attack_squad)
+            # Attack
+            if marines.amount >= self.attack_threshold and not self.is_attacking:
+                self.marine_attack_squad = set(self.units(UnitTypeId.MARINE).tags)
+                self.is_attacking = True
+                for marine in marines.tags_in(self.marine_attack_squad):
+                    marine.attack(self.enemy_start_locations[0])
+            # Retreat
+            elif len(self.marine_attack_squad) < self.attack_threshold * self.retreat_ratio and self.is_attacking:
+                for marine in marines.tags_in(self.marine_attack_squad):
+                    marine.attack(cc.position) #Set those attacking to attack move home
+                self.marine_attack_squad = set()
+                self.attack_threshold = min(self.max_attack_threshold,self.attack_threshold+self.attack_threshold_increment)
+                self.is_attacking = False
+            # Reinforce
+            elif len(self.marine_attack_squad) > self.attack_threshold * self.worthiness_ratio and self.is_attacking:
+                if len(marines.tags_not_in(self.marine_attack_squad))> self.attack_threshold* self.reinforce_ratio:
+                    self.marine_attack_squad.update(marines.tags_not_in(self.marine_attack_squad).tags)
+                    for marine in marines.tags_in(self.marine_attack_squad):
+                        marine.attack(self.enemy_start_locations[0])
+            # Patrol
+            for marine in marines.tags_in(self.marine_attack_squad):
+                if marine.is_idle:
+                    marine.attack(self.enemy_start_locations[0])
+            # Keep attacking
+            for marine in marines.tags_not_in(self.marine_attack_squad):
+                if marine.is_idle:
+                    marine.attack(cc.position)
 run_game(
     maps.get("PersephoneAIE_v4"),
     [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
