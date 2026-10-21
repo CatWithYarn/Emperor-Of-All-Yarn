@@ -8,6 +8,7 @@
 # Rally logic
 # Smarter attack logic - Partially done
 # Game messages
+# Add clean up logic
 
 from sc2 import maps
 from sc2.bot_ai import BotAI
@@ -23,7 +24,7 @@ Paths.EXECUTABLE = (
 )
 
 class MyBot(BotAI):
-    retreat_ratio = 0.4 # When to retreat
+    retreat_ratio = 0.5 # When to retreat
     worthiness_ratio = 0.8 # How much does the original force still have
     reinforce_ratio = 0.9 # Minimum force needed to reinforce
     attack_threshold_increment = 4
@@ -124,15 +125,18 @@ class MyBot(BotAI):
             # Attack
             if marines.amount >= self.attack_threshold and not self.is_attacking:
                 self.marine_attack_squad = set(self.units(UnitTypeId.MARINE).tags)
+                await self.chat_send("I, Emperor of all Yarn, send down this decree, all soldiers available, ATTACK!",True)
                 self.is_attacking = True
                 for marine in marines.tags_in(self.marine_attack_squad):
                     marine.attack(self.enemy_start_locations[0])
             # Retreat
             elif len(self.marine_attack_squad) < self.attack_threshold * self.retreat_ratio and self.is_attacking:
                 for marine in marines.tags_in(self.marine_attack_squad):
-                    marine.attack(cc.position) #Set those attacking to attack move home
+                    marine.move(cc.position) #Set those attacking to attack move home
                 self.marine_attack_squad = set()
                 self.attack_threshold = min(self.max_attack_threshold,self.attack_threshold+self.attack_threshold_increment)
+                # if self.is_attacking:
+                await self.chat_send("I, Emperor of all Yarn, send down this decree, my precious soldiers, RETREAT!",True)
                 self.is_attacking = False
             # Reinforce
             elif len(self.marine_attack_squad) > self.attack_threshold * self.worthiness_ratio and self.is_attacking:
@@ -140,6 +144,7 @@ class MyBot(BotAI):
                     self.marine_attack_squad.update(marines.tags_not_in(self.marine_attack_squad).tags)
                     for marine in marines.tags_in(self.marine_attack_squad):
                         marine.attack(self.enemy_start_locations[0])
+                    await self.chat_send("I, Emperor of all Yarn, send down this decree, all soldiers reinforce the front at once",True)
             # Patrol
             for marine in marines.tags_in(self.marine_attack_squad):
                 if marine.is_idle:
@@ -151,7 +156,7 @@ class MyBot(BotAI):
 run_game(
     maps.get("PersephoneAIE_v4"),
     [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
-      Computer(Race.Zerg, Difficulty.VeryHard)],
+      Computer(Race.Zerg, Difficulty.Medium)],
     realtime=False,
     sc2_version="4.10"
 )
