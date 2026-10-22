@@ -3,7 +3,8 @@
 # Research
 # Rally logic
 # Game messages
-# Map analyzer for various stuff.
+# Map analyzer for various stuff <- Hard to implement
+
 from sc2 import maps
 from sc2.bot_ai import BotAI
 from sc2.data import Race, Difficulty
@@ -63,6 +64,12 @@ class MyBot(BotAI):
                 and self.supply_cap < 200):
             await self.build(UnitTypeId.SUPPLYDEPOT, near=cc)
         
+        # Expand once the current base has at least 2 barracks
+        if (barracks >= 2 * bases and bases < 5
+                and not self.already_pending(UnitTypeId.COMMANDCENTER)
+                and self.can_afford(UnitTypeId.COMMANDCENTER)):
+            await self.expand_now()
+          
         # Addon logic
         if (self.can_afford(UnitTypeId.REACTOR)):
             for rax in self.structures(UnitTypeId.BARRACKS).ready:
@@ -93,12 +100,6 @@ class MyBot(BotAI):
                 else:
                     if 1>len(rax.orders):
                         rax.train(UnitTypeId.MARINE)
-
-        # Expand once the current base has at least 2 barracks
-        if (barracks >= 2 * bases and bases < 5
-                and not self.already_pending(UnitTypeId.COMMANDCENTER)
-                and self.can_afford(UnitTypeId.COMMANDCENTER)):
-            await self.expand_now()
 
         # Gas mining
         if (self.gas_buildings.amount < 1 
@@ -181,7 +182,7 @@ class MyBot(BotAI):
 run_game(
     maps.get("PersephoneAIE_v4"),
     [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
-      Computer(Race.Zerg, Difficulty.Harder)],
+      Computer(Race.Zerg, Difficulty.VeryHard)],
     realtime=False,
     sc2_version="4.10"
 )
