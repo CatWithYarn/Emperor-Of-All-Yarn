@@ -1,4 +1,4 @@
-# To do:
+# To do (in no particular order):
 # Marine micro
 # Research
 # Rally logic
@@ -6,14 +6,14 @@
 # Map analyzer for various stuff <- Hard to implement
 # Dynamic scv count for resources actually available
 # Better expansion logic
+# Better economy management
+# Add stim and stim management
+# Refactor Code
+# Better combat decision (combat simulator)
 
-from sc2 import maps
 from sc2.bot_ai import BotAI
-from sc2.data import Race, Difficulty
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
-from sc2.main import run_game
-from sc2.player import Bot, Computer
 from sc2.paths import Paths, BINPATH, PF
 from sc2.ids.ability_id import AbilityId
 
@@ -125,7 +125,6 @@ class MyBot(BotAI):
                     worker.build_gas(geyser)
                     break
 
-        # In progress
         # Target system
         if iteration % 2 == 0:
             if self.attack_squad_is_idle:
@@ -133,8 +132,6 @@ class MyBot(BotAI):
                 self.target = self.enemy_start_locations[self.searched_bases]
                 self.attack_squad_is_idle=False
             
-
-        # In progress
         # More sophisticated attack logic
         # If not above threshold, don't attack
         # If above, transform all defense marines into attack
@@ -145,8 +142,17 @@ class MyBot(BotAI):
             marines = self.units(UnitTypeId.MARINE)
             # Discard dead marines
             self.marine_attack_squad = marines.tags.intersection(self.marine_attack_squad)
+            # Reinforce
+            if len(self.marine_attack_squad) > self.attack_threshold * self.worthiness_ratio and self.is_attacking:
+                if len(marines.tags_not_in(self.marine_attack_squad))> self.attack_threshold* self.reinforce_ratio:
+                    reinforcements = marines.tags_not_in(self.marine_attack_squad).tags
+                    self.marine_attack_squad.update(reinforcements)
+                    for marine in marines.tags_in(reinforcements):
+                        marine.attack(self.target)
+                    await self.chat_send("I, Emperor of all Yarn, send down this decree, all soldiers reinforce the front at once!",True)
+                    self.attack_squad_is_idle = False
             # Attack
-            if marines.amount >= self.attack_threshold *1.1 and not self.is_attacking:
+            elif marines.amount >= self.attack_threshold *1.1 and not self.is_attacking:
                 self.marine_attack_squad = set(self.units(UnitTypeId.MARINE).tags)
                 await self.chat_send("I, Emperor of all Yarn, send down this decree, all soldiers available, ATTACK!",True)
                 self.is_attacking = True
@@ -162,15 +168,6 @@ class MyBot(BotAI):
                 await self.chat_send("I, Emperor of all Yarn, send down this decree, my precious soldiers, RETREAT!",True)
                 self.is_attacking = False
                 self.attack_squad_is_idle = False
-            # Reinforce
-            elif len(self.marine_attack_squad) > self.attack_threshold * self.worthiness_ratio and self.is_attacking:
-                if len(marines.tags_not_in(self.marine_attack_squad))> self.attack_threshold* self.reinforce_ratio:
-                    reinforcements = marines.tags_not_in(self.marine_attack_squad).tags
-                    self.marine_attack_squad.update(reinforcements)
-                    for marine in marines.tags_in(reinforcements):
-                        marine.attack(self.target)
-                    await self.chat_send("I, Emperor of all Yarn, send down this decree, all soldiers reinforce the front at once!",True)
-                    self.attack_squad_is_idle = False
             # Patrol
             for marine in marines.tags_in(self.marine_attack_squad):
                 if marine.is_idle:
@@ -189,11 +186,3 @@ class MyBot(BotAI):
             for marine in marines.tags_not_in(self.marine_attack_squad):
                 if marine.is_idle:
                     marine.attack(cc.position)
-
-run_game(
-    maps.get("PersephoneAIE_v4"),
-    [Bot(Race.Terran, MyBot(),name="Emperor of all Yarn, Catigula"),
-      Computer(Race.Zerg, Difficulty.VeryHard)],
-    realtime=False,
-    sc2_version="4.10"
-)
