@@ -4,11 +4,14 @@
 # Rally logic
 # Game messages
 # Map analyzer for various stuff <- Hard to implement
+# Dynamic scv count for resources actually available
+# Better expansion logic
 
 from sc2 import maps
 from sc2.bot_ai import BotAI
 from sc2.data import Race, Difficulty
 from sc2.ids.unit_typeid import UnitTypeId
+from sc2.ids.upgrade_id import UpgradeId
 from sc2.main import run_game
 from sc2.player import Bot, Computer
 from sc2.paths import Paths, BINPATH, PF
@@ -44,6 +47,7 @@ class MyBot(BotAI):
         cc = self.townhalls.first
         bases = self.townhalls.amount
         barracks = self.structures(UnitTypeId.BARRACKS).amount
+        reactors = self.structures(UnitTypeId.BARRACKSREACTOR).amount
 
         await self.distribute_workers(1)
        
@@ -58,7 +62,7 @@ class MyBot(BotAI):
                 th.train(UnitTypeId.SCV)
 
         # Supply (buffer grows with production)
-        if (self.supply_left < 4 + 2 * barracks
+        if (self.supply_left < 4 + 2 * (barracks+reactors)
                 and self.already_pending(UnitTypeId.SUPPLYDEPOT) < 2
                 and self.can_afford(UnitTypeId.SUPPLYDEPOT)
                 and self.supply_cap < 200):
@@ -69,12 +73,15 @@ class MyBot(BotAI):
                 and not self.already_pending(UnitTypeId.COMMANDCENTER)
                 and self.can_afford(UnitTypeId.COMMANDCENTER)):
             await self.expand_now()
-          
+        
         # Addon logic
         if (self.can_afford(UnitTypeId.REACTOR)):
             for rax in self.structures(UnitTypeId.BARRACKS).ready:
                 if not rax.has_add_on and not rax.orders:
-                    rax.build(UnitTypeId.BARRACKSREACTOR)
+                    if self.structures(UnitTypeId.BARRACKSTECHLAB).amount == 0:
+                        rax.build(UnitTypeId.BARRACKSTECHLAB) # Only build one reactor
+                    else:
+                        rax.build(UnitTypeId.BARRACKSREACTOR)
                     break
         
         # Barracks: up to 3 per base     
@@ -90,7 +97,11 @@ class MyBot(BotAI):
                 worker = self.select_build_worker(position)
                 if worker:
                     worker.build(UnitTypeId.BARRACKS, position)   
-
+        # Addon research
+        # Shieldwall is the name for combat shield
+        if UpgradeId.SHIELDWALL not in self.state.upgrades and self.structures(UnitTypeId.BARRACKSTECHLAB).amount>0:
+            if self.can_afford(UpgradeId.SHIELDWALL) and not self.already_pending_upgrade(UpgradeId.SHIELDWALL):
+                self.research(UpgradeId.SHIELDWALL)
         # Marine Production
         for rax in self.structures(UnitTypeId.BARRACKS).ready:
             if self.can_afford(UnitTypeId.MARINE):
